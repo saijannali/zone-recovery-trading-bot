@@ -9,9 +9,9 @@
 CTrade trade;
 
 //static variables
-input int startingLotSize = 1.0;
-input int entrytToProfitPips = 150.0;
-input int zoneRecoveryPips = 50.0;
+input int startingLotSize = 1;
+input int entrytToProfitPips = 300;
+input int zoneRecoveryPips = 100;
 
 input int slippage = 5;           // MAX Slippage in points
 input int magicNumber = 99999;      // Unique identifier for the EA
@@ -27,9 +27,6 @@ double buyLinePrice = 0.0;    // price of the buy line (top line of recovery zon
 double enteredLots = 0.0;     // running counter of lots entered
 double profitLine = 0.0;      // Initial TP line
 double stopLine = 0.0;        // Initial Stop Line
-
-
-
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -57,6 +54,66 @@ void OnTick()
 
 
   }
+  
+void OnTradeTransaction(const MqlTradeTransaction& trans, const MqlTradeRequest& request, const MqlTradeResult& result)
+{
+    // Check if the transaction type is DEAL_ADD which means a deal has been executed
+    if(trans.type == TRADE_TRANSACTION_DEAL_ADD)
+    {
+        // Select the deal using its deal ID
+        if(HistoryDealSelect(trans.deal))
+        {
+            // Create a deal object to retrieve information
+            CDealInfo deal_info;
+            deal_info.Ticket(trans.deal);
+
+            // Check the deal type to confirm if it's a stop order (buy or sell)
+            if(deal_info.Type() == DEAL_TYPE_BUY)
+            {
+                // Retrieve information about the deal
+                double price = deal_info.Price();
+                double volume = deal_info.Volume();
+                string symbol = deal_info.Symbol();
+
+                // Print out the deal information
+                Print("Buy Order Filled - Symbol: ", symbol, ", Price: ", price, ", Volume: ", volume);
+            }
+          if(deal_info.Type() == DEAL_TYPE_SELL) {
+                            // Retrieve information about the deal
+                double price = deal_info.Price();
+                double volume = deal_info.Volume();
+                string symbol = deal_info.Symbol();
+
+                // Print out the deal information
+                Print("Sell Order Filled - Symbol: ", symbol, ", Price: ", price, ", Volume: ", volume);
+          }
+        }
+    }
+}
+  
+/*
+void OnTrade() {
+   for(int i = OrdersHistoryTotal() - 1; i >= 0; i--) {
+       //if(OrderSelect(i, SELECT_BY_POS, MODE_HISTORY)) {
+     		if (OrderGetTicket(0))
+           if(OrderSymbol() == Symbol()) {
+               // This is a trade event for our symbol and magic number
+               if(OrderType() == ORDER_TYPE_BUY_STOP) {
+                 
+                 // SET SELL STOP
+                 Print("Set new sell stop")
+                 
+               } 
+             		if (OrderType() == ORDER_TYPE_SELL_STOP) {
+                  // SET BUY STOP
+                  Print("Set new buy stop")
+               }
+           }
+       }
+   }
+}
+*/
+
 
 //new trade cycle starter
 void enterInitialBuyTrade()
@@ -68,12 +125,8 @@ void enterInitialBuyTrade()
    stopLine = currentAsk - (entrytToProfitPips + zoneRecoveryPips) * _Point;
    profitLine = (currentAsk + entrytToProfitPips * _Point);
    bool buyTradeSuccess = trade.Buy(startingLotSize,NULL,currentAsk,stopLine,profitLine, _Digits);
-
-//2nd trade for testing
-//Sleep(10000);
-//currentAsk = NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_ASK),_Digits);
-//bool buyTradeSuccess2 = trade.Buy(startingLotSize,NULL,currentAsk,0,(currentAsk + entrytToClosePips * _Point), _Digits);
-
+   
+  
 //error handling
    if(!buyTradeSuccess)
      {
@@ -108,6 +161,7 @@ void enterIntialInvalidPendingTrade()
    //buyLinePrice - zoneRecoveryPips
 
    trade.SellStop(1.0, buyLinePrice-(zoneRecoveryPips*_Point),NULL,profitLine,stopLine,ORDER_TIME_GTC,0,NULL);
+   Print(zoneRecoveryPips); // ERROR! ZONE RECOVERY 50 WHY EVEN WHEN SET TO 100?
   }
 
 
