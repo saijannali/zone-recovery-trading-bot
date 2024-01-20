@@ -14,8 +14,8 @@ input int entrytToProfitPips = 150;
 //input int zoneRecoveryPips = 100;
 int zoneRecoveryPips = 50;
 
-double buyLotsArray[7] = {1,1,1.9,4,5,6,1};
-double sellLotsArray[7] = {1.4,1.4,2.5,1,1,1,1};
+double buyLotsArray[10] = {1,0.79,1.40,2.49,4.43,7.87,14.00,24.88,44.24,78.64};
+double sellLotsArray[10] = {1.34,1.05,1.87,3.32,5.9,10.50,18.66,33.18,58.98,104.86};
 int currentBuyIdx = 0;
 int currentSellIdx = 0;
 
@@ -28,6 +28,10 @@ input int OP_SELLSTOP = 5;
 
 bool didSetBuyStop = false;
 bool didSetSellStop = false;
+
+//Stats
+int maxTrades = 0;
+datetime firstTradeOpenTime;
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -78,15 +82,12 @@ void OnTradeTransaction(const MqlTradeTransaction& trans, const MqlTradeRequest&
          // Create a deal object to retrieve information
          CDealInfo deal_info;
          deal_info.Ticket(trans.deal);
-         
 
          deal_info.InfoInteger(DEAL_REASON, dealReason);
-         Print(dealReason);
          
          if((ENUM_DEAL_REASON)dealReason == DEAL_REASON_TP || (ENUM_DEAL_REASON)dealReason == DEAL_REASON_SL)
          {
              CloseAllTrades();
-             Print("TPTPTPTPTPTPTPTPTPT");
              return;
          }
          if((ENUM_DEAL_REASON)dealReason == DEAL_REASON_EXPERT)
@@ -116,7 +117,7 @@ void enterInitialBuyTrade()
    stopLine = currentAsk - (entrytToProfitPips + zoneRecoveryPips) * _Point;
    profitLine = (currentAsk + entrytToProfitPips * _Point);
    bool buyTradeSuccess = trade.Buy(startingLotSize,NULL,currentAsk,stopLine,profitLine, _Digits);
-
+ 
 
 //error handling
    if(!buyTradeSuccess)
@@ -125,10 +126,9 @@ void enterInitialBuyTrade()
      }
    else     //update info
      {
-
-      ulong ticket = PositionGetTicket(0);
-
-
+      maxTrades = maxTrades + 1; 
+      firstTradeOpenTime = TimeCurrent();
+      int ticket = PositionGetTicket(0);
 
       if(PositionSelectByTicket(ticket))
         {
@@ -148,6 +148,7 @@ void enterInitialBuyTrade()
 void enterSellPendingTrade()
 {
    didSetBuyStop = false;
+   
   
    
    // Get bid price
@@ -155,9 +156,13 @@ void enterSellPendingTrade()
    //buyLinePrice - zoneRecoveryPips
    if (didSetSellStop == false) {
           double lotSize = sellLotsArray[currentSellIdx];
-   				trade.SellStop(lotSize, buyLinePrice-(zoneRecoveryPips*_Point),NULL,profitLine,stopLine,ORDER_TIME_GTC,0,NULL);
+   		 bool isSuccess = trade.SellStop(lotSize, buyLinePrice-(zoneRecoveryPips*_Point),NULL,profitLine,stopLine,ORDER_TIME_GTC,0,NULL);
+   		 
+   		 if(isSuccess){	
       		didSetSellStop = true;
      			currentBuyIdx = currentBuyIdx + 1;
+     			maxTrades = maxTrades + 1;
+     		}
 		}
 
 }
@@ -175,9 +180,13 @@ void enterBuyPendingTrade()
     //buyLinePrice - zoneRecoveryPips
   	if (didSetBuyStop == false) {
           double lotSize = buyLotsArray[currentBuyIdx];
-    			trade.BuyStop(lotSize, buyLinePrice,NULL,stopLine,profitLine,ORDER_TIME_GTC,0,NULL);
+    		 bool isSuccess = trade.BuyStop(lotSize, buyLinePrice,NULL,stopLine,profitLine,ORDER_TIME_GTC,0,NULL);
+    		 
+    		 if(isSuccess){
       		didSetBuyStop = true;
       		currentSellIdx = currentSellIdx + 1;
+      		maxTrades = maxTrades + 1;
+      	}
 		}
 
 }
@@ -186,6 +195,13 @@ void CloseAllTrades()
 {
    COrderInfo order;
    CPositionInfo position;
+
+   double elapsedTime = (double)(TimeCurrent() - firstTradeOpenTime);
+   int hours = (int)(elapsedTime / 3600);
+   int minutes = ((int)elapsedTime % 3600) / 60;
+   int seconds = ((int)elapsedTime % 3600) % 60;
+   Print("Elapsed time since the first trade: ", hours, " hours ", minutes, " minutes ", seconds, " seconds");
+   
 
    // Loop through all orders
    for(int i = OrdersTotal() - 1; i >= 0; i--)
@@ -207,8 +223,13 @@ void CloseAllTrades()
        }
    }
    
+   
+   Print("maxtrades: " + maxTrades);
+   
    currentSellIdx = 0;
    currentBuyIdx = 0;
+   maxTrades = 0;
+   
 }
 
 
